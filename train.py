@@ -32,6 +32,22 @@ from model import (
 )
 
 
+def _safe_config_for_checkpoint() -> Dict[str, object]:
+    """
+    Build a serialization-safe config dict for checkpoint metadata.
+
+    Why this helper exists:
+    - Dataclass fields may contain `Path` objects.
+    - In newer PyTorch versions with stricter safe loading defaults,
+      non-primitive objects can complicate checkpoint loading.
+    - Converting `Path` to `str` keeps metadata readable and portable.
+    """
+    safe_cfg: Dict[str, object] = {}
+    for key, value in CFG.__dict__.items():
+        safe_cfg[key] = str(value) if isinstance(value, Path) else value
+    return safe_cfg
+
+
 def run_one_epoch(
     model: torch.nn.Module,
     loader: torch.utils.data.DataLoader,
@@ -137,7 +153,7 @@ def train_phase(
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
                 "val_acc": val_acc,
-                "config": CFG.__dict__,
+                "config": _safe_config_for_checkpoint(),
             }
             torch.save(checkpoint, checkpoint_path)
             print(f"Saved new best checkpoint to: {checkpoint_path} (val_acc={val_acc:.4f})")

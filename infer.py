@@ -51,6 +51,35 @@ def preprocess_image(image_path: Path, image_size: int, device: torch.device) ->
     return tensor.to(device)
 
 
+def resolve_infer_image_path(config_path: Path) -> Path:
+    """
+    Resolve a usable image path for inference.
+
+    Behavior:
+    - Use `config_path` if it exists.
+    - Otherwise, fallback to the first image found under test split.
+    - Raise a clear error if no image is available anywhere.
+    """
+    if config_path.exists():
+        return config_path
+
+    # Fallback makes `infer.py` more robust when the config path is stale.
+    fallback_candidates = sorted(CFG.test_dir.glob("*/*.jpg"))
+    if fallback_candidates:
+        chosen = fallback_candidates[0]
+        print(
+            f"Configured infer image not found: {config_path}\n"
+            f"Falling back to: {chosen}"
+        )
+        return chosen
+
+    raise FileNotFoundError(
+        f"Image not found: {config_path}\n"
+        "No fallback image found under test split. "
+        "Set `infer_image_path` in config.py to a valid image file."
+    )
+
+
 def load_model_for_inference(
     checkpoint_path: Path,
     class_names: List[str],
@@ -60,7 +89,9 @@ def load_model_for_inference(
     Build model architecture and load trained weights for inference.
     """
     model = build_model(num_classes=len(class_names)).to(device)
-    checkpoint = torch.load(str(checkpoint_path), map_location=device)
+    # Same PyTorch 2.6+ compatibility note as in `evaluate.py`.
+    # We use `weights_only=False` for locally generated trusted checkpoints.
+    checkpoint = torch.load(str(checkpoint_path), map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
     return model
@@ -102,8 +133,10 @@ def main() -> None:
         device=device,
     )
 
+    infer_image_path = resolve_infer_image_path(CFG.infer_image_path)
+
     input_tensor = preprocess_image(
-        image_path=CFG.infer_image_path,
+        image_path=infer_image_path,
         image_size=CFG.image_size,
         device=device,
     )
@@ -114,7 +147,7 @@ def main() -> None:
         class_names=class_names,
     )
 
-    print(f"Image: {CFG.infer_image_path}")
+    print(f"Image: {infer_image_path}")
     print(f"Predicted class: {pred_class}")
     print(f"Confidence: {confidence:.4f}")
 

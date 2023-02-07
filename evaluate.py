@@ -67,7 +67,11 @@ def load_checkpoint_into_model(model: torch.nn.Module, checkpoint_path: str, dev
     """
     Load saved checkpoint weights into model.
     """
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    # PyTorch 2.6+ defaults to `weights_only=True`, which can fail for
+    # older/custom checkpoint dictionaries containing non-tensor objects.
+    # We explicitly set `weights_only=False` because this project loads
+    # checkpoints generated locally by `train.py` (trusted source).
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
     return checkpoint
 

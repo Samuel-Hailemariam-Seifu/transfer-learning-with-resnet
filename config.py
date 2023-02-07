@@ -94,7 +94,9 @@ class Config:
     # Inference settings:
     # File path to test one image in `infer.py`.
     # ---------------------------------------------------------------------
-    infer_image_path: Path = Path("./sample.jpg")
+    # Default points to one generated sample so `python infer.py` works
+    # immediately after dataset creation.
+    infer_image_path: Path = Path("./dataset/test/class0/class0_000.jpg")
 
     @property
     def best_checkpoint_path(self) -> Path:
